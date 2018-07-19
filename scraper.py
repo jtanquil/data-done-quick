@@ -77,7 +77,10 @@ def scrape_donations(requests_count):
         donation_bids['bid_id'] += new_bid_id
         donation_bids['option_id'] += new_option_id
         donation_bids['Amount'] += new_amount
-        
+
+        print('Pages scraped: {}, Donations scraped: {}'.format(offset_pages, offset_donations), end = '\r')
+
+    print('Total pages scraped: {}, Total donations scraped: {}'.format(offset_pages, offset_donations))     
 
     # write the data into a csv file - if it's not the top of the table, skip the header
     write_csv(pd.DataFrame.from_dict(donations), 'donations.csv', 'a+', header = False)
