@@ -51,42 +51,46 @@ def scrape_donations(requests_count):
     donation_bids = {'donation_id': [], 'bid_id' : [], 'option_id' : [], 'Amount' : []}
     
     # offset for the next set of donations
-    offset_pages = 0
-    offset_donations = 0
+    scraped_pages = 0
+    scraped_donations = 0
 
-    # scrape pages while under 30000 requests
-    while(offset_pages + offset_donations < 30000):
-        # increment the page counter
-        offset_pages += 1 
-        # load the page into a BeautifulSoup object
-        soup = BeautifulSoup(requests.get(root.format('/donations/?page={}'.format(int(requests_count['pages']) + offset_pages)), 'r').text, 'html.parser')
-        donation_index = soup.find_all('tr')[1:]
+    # catch getting kicked by remote host/getting to the end of the donations list/etc
+    try:
+        # scrape pages while under 30000 requests
+        while(scraped_pages + scraped_donations < 30000):
+            # increment the page counter
+            scraped_pages += 1 
+            # load the page into a BeautifulSoup object
+            soup = BeautifulSoup(requests.get(root.format('/donations/?page={}'.format(int(requests_count['pages']) + scraped_pages)), 'r').text, 'html.parser')
+            donation_index = soup.find_all('tr')[1:]
 
-        # update donation columns
-        new_ids = [get_id(tr.find_all('td')[2]) for tr in donation_index]
+            # update the donation_bids table and the comments column of donations
+            new_ids = [get_id(tr.find_all('td')[2]) for tr in donation_index]
 
-        donations['id'] += new_ids
-        donations['Name'] += [clean_text(tr.find_all('td')[0].get_text()) for tr in donation_index]
-        donations['Timestamp'] += [clean_text(tr.find_all('td')[1].get_text()) for tr in donation_index]
-        donations['Amount'] += [clean_text(tr.find_all('td')[2].get_text()) for tr in donation_index]
-        
-        # update the donation_bids table and the comments column of donations
-        new_comments, new_donation_id, new_amount, new_option_id, new_bid_id, offset_donations = secondary_donations_table(new_ids, offset_donations)
-        donations['Comment'] += new_comments
-        donation_bids['donation_id'] += new_donation_id
-        donation_bids['bid_id'] += new_bid_id
-        donation_bids['option_id'] += new_option_id
-        donation_bids['Amount'] += new_amount
+            new_comments, new_donation_id, new_amount, new_option_id, new_bid_id, scraped_donations = secondary_donations_table(new_ids, scraped_donations)
+            donations['Comment'] += new_comments
+            donation_bids['donation_id'] += new_donation_id
+            donation_bids['bid_id'] += new_bid_id
+            donation_bids['option_id'] += new_option_id
+            donation_bids['Amount'] += new_amount
 
-        print('Pages scraped: {}, Donations scraped: {}'.format(offset_pages, offset_donations), end = '\r')
+            # update donation columns
+            donations['id'] += new_ids
+            donations['Name'] += [clean_text(tr.find_all('td')[0].get_text()) for tr in donation_index]
+            donations['Timestamp'] += [clean_text(tr.find_all('td')[1].get_text()) for tr in donation_index]
+            donations['Amount'] += [clean_text(tr.find_all('td')[2].get_text()) for tr in donation_index]         
 
-    print('Total pages scraped: {}, Total donations scraped: {}'.format(offset_pages, offset_donations))     
+            print('Pages scraped: {}, Donations scraped: {}'.format(scraped_pages, scraped_donations), end = '\r')
+
+        print('Total pages scraped: {}, Total donations scraped: {}'.format(scraped_pages, scraped_donations))
+    except:
+        print('An error occurred, updating donations.csv and donation_bids.csv!')
 
     # write the data into a csv file - if it's not the top of the table, skip the header
     write_csv(pd.DataFrame.from_dict(donations), 'donations.csv', 'a+', header = False)
     write_csv(pd.DataFrame.from_dict(donation_bids), 'donation_bids.csv', 'a+', header = False)
     # write the new request counts into a text file
-    write_request_count(int(requests_count['pages']) + offset_pages, int(requests_count['donations']) + offset_donations)
+    write_request_count(int(requests_count['pages']) + scraped_pages, int(requests_count['donations']) + scraped_donations)
 
 
 def secondary_donations_table(donation_ids, num_donations):
